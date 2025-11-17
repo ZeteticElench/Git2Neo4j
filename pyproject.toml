@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "git2neo4j"
+version = "0.1.0"
+description = "A strongly-typed Python program to sync Git repositories with Neo4j and enable Git operations via Cypher queries"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Git2Neo4j Contributors"}
+]
+keywords = ["git", "neo4j", "graph", "version-control", "cypher"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Database",
+]
+
+dependencies = [
+    "neo4j>=5.14.0",
+    "pydantic>=2.5.0",
+    "gitpython>=3.1.40",
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.6",
+    "black>=23.11.0",
+]
+
+[project.scripts]
+git2neo4j = "git2neo4j.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/ZeteticElench/Git2Neo4j"
+Repository = "https://github.com/ZeteticElench/Git2Neo4j"
+Issues = "https://github.com/ZeteticElench/Git2Neo4j/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["git2neo4j*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = false
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=git2neo4j --cov-report=term-missing"
