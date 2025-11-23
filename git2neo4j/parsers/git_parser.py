@@ -134,8 +134,12 @@ class GitParser:
             ValueError: If blob not found
         """
         try:
-            obj = self.repo.odb.info(sha)
-            blob = self.repo.odb.stream(sha)
+            # Convert hex SHA to binary for ODB
+            import binascii
+            sha_bin = binascii.unhexlify(sha)
+
+            obj = self.repo.odb.info(sha_bin)
+            blob = self.repo.odb.stream(sha_bin)
             content = blob.read()
 
             return BlobObject(
@@ -145,7 +149,7 @@ class GitParser:
                 content=content,
                 path=path,
             )
-        except (git.exc.BadName, ValueError) as e:
+        except (git.exc.BadName, ValueError, binascii.Error) as e:
             raise ValueError(f"Blob not found: {sha}") from e
 
     def get_all_trees_for_commit(self, commit_sha: str) -> Iterator[TreeObject]:
