@@ -52,12 +52,20 @@ Relationships:
 pip install git2neo4j
 ```
 
+### GUI Support (Optional)
+
+Install with GUI support:
+
+```bash
+pip install "git2neo4j[gui]"
+```
+
 Or for development:
 
 ```bash
 git clone https://github.com/ZeteticElench/Git2Neo4j.git
 cd Git2Neo4j
-pip install -e ".[dev]"
+pip install -e ".[dev,gui]"
 ```
 
 ## Quick Start
@@ -123,6 +131,25 @@ git2neo4j branch --list
 # Create a new branch in Neo4j (mirrors to Git)
 git2neo4j branch --create feature-branch --from main
 ```
+
+### 4. Use the GUI (Optional)
+
+If you installed with GUI support, launch the graphical interface:
+
+```bash
+git2neo4j-gui
+```
+
+The GUI provides:
+- **Local Repository Sync**: Browse and sync local Git repositories
+- **GitHub Integration**: Sync repositories, organizations, or user repos from GitHub
+- **Bulk Import**: Import multiple repositories from a folder
+- **Query Explorer**: Execute Cypher queries with example templates
+- **Visual Results**: View query results in tabular format
+- **Connection Status**: Real-time Neo4j connection monitoring
+- **Activity Logs**: Track all operations and errors
+
+![Git2Neo4j GUI Screenshot](docs/images/gui-screenshot.png)
 
 ## Cypher to Git Command Mapping
 

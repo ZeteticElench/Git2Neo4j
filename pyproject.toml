@@ -44,9 +44,13 @@ dev = [
     "ruff>=0.1.6",
     "black>=23.11.0",
 ]
+gui = [
+    "PySide6>=6.6.0",
+]
 
 [project.scripts]
 git2neo4j = "git2neo4j.cli:app"
+git2neo4j-gui = "git2neo4j.gui.main_window:main"
 
 [project.urls]
 Homepage = "https://github.com/ZeteticElench/Git2Neo4j"
