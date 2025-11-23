@@ -545,6 +545,73 @@ def cypher(
         raise typer.Exit(1)
 
 
+@app.command(name="install-hook")
+def install_hook(
+    repo_path: str = typer.Argument(
+        ".",
+        help="Path to Git repository",
+    ),
+    hook_type: str = typer.Option(
+        "post-commit",
+        "--hook",
+        "-h",
+        help="Hook type to install (post-commit, post-receive, github-action)",
+    ),
+    config_only: bool = typer.Option(
+        False,
+        "--config-only",
+        help="Only create configuration file",
+    ),
+) -> None:
+    """Install Git hook for automatic Neo4j synchronization."""
+    from git2neo4j.hooks.install_hooks import (
+        add_to_gitignore,
+        create_config_file,
+        install_github_action,
+        install_local_hook,
+    )
+
+    repo_path_obj = Path(repo_path).resolve()
+
+    if not repo_path_obj.exists():
+        console.print(f"[red]Error: Repository path does not exist: {repo_path}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold blue]Installing Git2Neo4j hooks in:[/bold blue] {repo_path_obj}\n")
+
+    # Create configuration file
+    if config_only or hook_type != "github-action":
+        create_config_file(repo_path_obj)
+        add_to_gitignore(repo_path_obj)
+
+    if config_only:
+        console.print("\n[green]✓ Configuration file created![/green]")
+        console.print("Edit .git2neo4j.conf to set your Neo4j connection details.")
+        return
+
+    # Install hooks
+    try:
+        if hook_type == "github-action":
+            success = install_github_action(repo_path_obj)
+        else:
+            success = install_local_hook(repo_path_obj, hook_type)
+
+        if success:
+            console.print("\n[bold green]✓ Installation complete![/bold green]")
+            if hook_type == "github-action":
+                console.print("\nAdd GitHub secrets and commit the workflow file.")
+            else:
+                console.print("\nMake a commit to test the hook.")
+                console.print("Configure Neo4j connection in .git2neo4j.conf")
+        else:
+            console.print("\n[red]✗ Installation failed![/red]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Installation error: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command()
 def version() -> None:
     """Show version information."""

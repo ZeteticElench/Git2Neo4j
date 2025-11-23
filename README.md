@@ -41,6 +41,10 @@ Relationships:
 - **Cypher-based Git Operations**: Perform Git operations using Cypher queries
 - **Incremental Updates**: Efficient syncing of only changed objects
 - **Full History**: Complete Git history preserved in the graph
+- **Automatic Sync**: Git hooks for automatic syncing on commit or push
+- **Full-Text Search**: Search code content, commit messages, and file paths
+- **Bulk Import**: Import entire workspaces of Git repositories
+- **Multi-Repository Support**: Manage multiple repositories in single database
 
 ## Installation
 
@@ -130,6 +134,43 @@ git2neo4j branch --create feature-branch --from main
 | `git diff <sha1> <sha2>` | Compare trees between commits |
 | `git merge-base <sha1> <sha2>` | Find common ancestor in DAG |
 | `git blame <file>` | Traverse commit history for specific blob changes |
+
+## Automatic Sync with Git Hooks
+
+Automatically sync your repository to Neo4j on every commit or push:
+
+### Local Hook (sync on commit)
+
+```bash
+# Install post-commit hook
+git2neo4j install-hook /path/to/repo
+
+# Configure Neo4j connection
+nano .git2neo4j.conf
+
+# Make a commit - it will automatically sync!
+git commit -m "Auto-sync to Neo4j"
+# Output: ✓ Synced to Neo4j: 1 commits
+```
+
+### GitHub Actions (sync on push)
+
+```bash
+# Install GitHub Actions workflow
+git2neo4j install-hook /path/to/repo --hook github-action
+
+# Add secrets to GitHub repository settings:
+# - NEO4J_URI
+# - NEO4J_USER
+# - NEO4J_PASSWORD
+
+# Commit and push the workflow
+git add .github/workflows/sync-to-neo4j.yml
+git commit -m "Add Neo4j auto-sync"
+git push  # Will automatically sync to Neo4j!
+```
+
+**See [Git Hooks Documentation](docs/GIT_HOOKS.md) for detailed setup and configuration options.**
 
 ## Configuration
 

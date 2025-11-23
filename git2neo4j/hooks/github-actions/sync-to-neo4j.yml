@@ -1,0 +1,73 @@
+name: Sync to Neo4j
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  # Optionally run on pull requests
+  # pull_request:
+  #   branches:
+  #     - main
+
+jobs:
+  sync-to-neo4j:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for complete sync
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install git2neo4j
+        run: |
+          pip install git2neo4j
+
+      - name: Sync to Neo4j
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USER: ${{ secrets.NEO4J_USER }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE || 'neo4j' }}
+        run: |
+          git2neo4j sync . \
+            --uri "$NEO4J_URI" \
+            --user "$NEO4J_USER" \
+            --password "$NEO4J_PASSWORD" \
+            --database "$NEO4J_DATABASE" \
+            --trees \
+            --no-blobs
+
+      - name: Populate text content (optional)
+        if: ${{ vars.POPULATE_TEXT_CONTENT == 'true' }}
+        env:
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USER: ${{ secrets.NEO4J_USER }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE || 'neo4j' }}
+        run: |
+          python -c "
+          from git2neo4j.sync import GitToNeo4jSync
+          import os
+          with GitToNeo4jSync(
+              repo_path='.',
+              neo4j_uri=os.getenv('NEO4J_URI'),
+              neo4j_user=os.getenv('NEO4J_USER'),
+              neo4j_password=os.getenv('NEO4J_PASSWORD'),
+              neo4j_database=os.getenv('NEO4J_DATABASE', 'neo4j'),
+          ) as sync:
+              count = sync.populate_blob_content()
+              print(f'Populated {count} blobs with text content')
+          "
+
+      - name: Report sync status
+        if: always()
+        run: |
+          echo "✓ Repository synced to Neo4j successfully"

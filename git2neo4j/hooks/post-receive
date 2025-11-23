@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""
+Git post-receive hook for syncing to Neo4j (server-side).
+
+This hook runs on the Git server after receiving a push.
+Install by copying to hooks/post-receive in your bare repository.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# Add git2neo4j to path if installed locally
+try:
+    from git2neo4j.sync.git_to_neo4j import GitToNeo4jSync
+except ImportError:
+    print("Warning: git2neo4j not found. Install with: pip install git2neo4j")
+    sys.exit(0)
+
+
+def load_hook_config():
+    """Load Neo4j configuration from environment or config file."""
+    # For bare repositories, config might be in a different location
+    git_dir = os.getenv("GIT_DIR", ".")
+    config_file = Path(git_dir) / "git2neo4j.conf"
+
+    config = {
+        "neo4j_uri": os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        "neo4j_user": os.getenv("NEO4J_USER", "neo4j"),
+        "neo4j_password": os.getenv("NEO4J_PASSWORD", "password"),
+        "neo4j_database": os.getenv("NEO4J_DATABASE", "neo4j"),
+        "sync_trees": os.getenv("GIT2NEO4J_SYNC_TREES", "true").lower() == "true",
+        "enabled": os.getenv("GIT2NEO4J_ENABLED", "true").lower() == "true",
+    }
+
+    if config_file.exists():
+        with open(config_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        key = key.strip().lower()
+                        value = value.strip().strip('"').strip("'")
+                        if value.lower() in ("true", "false"):
+                            value = value.lower() == "true"
+                        config[key] = value
+
+    return config
+
+
+def sync_to_neo4j():
+    """Sync the repository to Neo4j after receiving push."""
+    config = load_hook_config()
+
+    if not config.get("enabled", True):
+        return
+
+    # Get repository path (might be bare)
+    git_dir = os.getenv("GIT_DIR", ".")
+    repo_path = Path(git_dir).resolve()
+
+    # If it's a bare repository, the path itself is the repo
+    if not (repo_path / ".git").exists() and (repo_path / "HEAD").exists():
+        # This is a bare repository
+        pass
+    else:
+        # Non-bare repository
+        if repo_path.name == ".git":
+            repo_path = repo_path.parent
+
+    try:
+        with GitToNeo4jSync(
+            repo_path=repo_path,
+            neo4j_uri=config["neo4j_uri"],
+            neo4j_user=config["neo4j_user"],
+            neo4j_password=config["neo4j_password"],
+            neo4j_database=config["neo4j_database"],
+            sync_trees=config.get("sync_trees", True),
+        ) as sync:
+            if not sync.verify_connection():
+                print("Warning: Could not connect to Neo4j")
+                return
+
+            stats = sync.sync_repository(create_schema=False)
+            print(f"✓ Synced to Neo4j: {stats.get('commits', 0)} commits")
+
+    except Exception as e:
+        print(f"Warning: Failed to sync to Neo4j: {e}")
+
+
+if __name__ == "__main__":
+    # Read the ref updates from stdin
+    # Format: <old-value> <new-value> <ref-name>
+    for line in sys.stdin:
+        old_sha, new_sha, ref_name = line.strip().split()
+        print(f"Received push to {ref_name}: {old_sha[:7]}..{new_sha[:7]}")
+
+    # Sync to Neo4j
+    sync_to_neo4j()

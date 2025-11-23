@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""
+Git post-commit hook for syncing to Neo4j.
+
+This hook automatically syncs the repository to Neo4j after each commit.
+Install by copying to .git/hooks/post-commit and making it executable.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# Add git2neo4j to path if installed locally
+try:
+    from git2neo4j.sync.git_to_neo4j import GitToNeo4jSync
+    from git2neo4j.config import Config
+except ImportError:
+    print("Warning: git2neo4j not found. Install with: pip install git2neo4j")
+    sys.exit(0)  # Don't fail the commit
+
+
+def load_hook_config():
+    """Load Neo4j configuration from .git2neo4j.conf or environment."""
+    repo_root = Path.cwd()
+    config_file = repo_root / ".git2neo4j.conf"
+
+    # Default configuration
+    config = {
+        "neo4j_uri": os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        "neo4j_user": os.getenv("NEO4J_USER", "neo4j"),
+        "neo4j_password": os.getenv("NEO4J_PASSWORD", "password"),
+        "neo4j_database": os.getenv("NEO4J_DATABASE", "neo4j"),
+        "sync_trees": os.getenv("GIT2NEO4J_SYNC_TREES", "true").lower() == "true",
+        "sync_blobs": os.getenv("GIT2NEO4J_SYNC_BLOBS", "false").lower() == "true",
+        "populate_text": os.getenv("GIT2NEO4J_POPULATE_TEXT", "false").lower() == "true",
+        "enabled": os.getenv("GIT2NEO4J_ENABLED", "true").lower() == "true",
+    }
+
+    # Override with config file if it exists
+    if config_file.exists():
+        with open(config_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        key = key.strip().lower()
+                        value = value.strip().strip('"').strip("'")
+
+                        # Convert boolean strings
+                        if value.lower() in ("true", "false"):
+                            value = value.lower() == "true"
+
+                        config[key] = value
+
+    return config
+
+
+def sync_to_neo4j():
+    """Sync the repository to Neo4j."""
+    config = load_hook_config()
+
+    # Check if hook is enabled
+    if not config.get("enabled", True):
+        return
+
+    repo_path = Path.cwd()
+
+    try:
+        with GitToNeo4jSync(
+            repo_path=repo_path,
+            neo4j_uri=config["neo4j_uri"],
+            neo4j_user=config["neo4j_user"],
+            neo4j_password=config["neo4j_password"],
+            neo4j_database=config["neo4j_database"],
+            sync_trees=config.get("sync_trees", True),
+            sync_blobs=config.get("sync_blobs", False),
+        ) as sync:
+            # Verify connection
+            if not sync.verify_connection():
+                print("Warning: Could not connect to Neo4j. Skipping sync.")
+                return
+
+            # Perform incremental sync
+            stats = sync.sync_repository(create_schema=False)
+
+            # Optionally populate text content
+            if config.get("populate_text", False):
+                blob_count = sync.populate_blob_content()
+
+            print(f"✓ Synced to Neo4j: {stats.get('commits', 0)} commits")
+
+    except Exception as e:
+        print(f"Warning: Failed to sync to Neo4j: {e}")
+        # Don't fail the commit even if sync fails
+
+
+if __name__ == "__main__":
+    sync_to_neo4j()
