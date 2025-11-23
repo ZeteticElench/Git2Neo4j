@@ -135,6 +135,56 @@ git2neo4j branch --create feature-branch --from main
 | `git merge-base <sha1> <sha2>` | Find common ancestor in DAG |
 | `git blame <file>` | Traverse commit history for specific blob changes |
 
+## Sync GitHub Repositories
+
+Sync GitHub repositories directly without cloning using the GitHub API:
+
+### Single Repository
+
+```bash
+# Public repository
+git2neo4j github-sync torvalds/linux --uri bolt://localhost:7687 -p password
+
+# Private repository (requires token)
+export GITHUB_TOKEN=ghp_your_token_here
+git2neo4j github-sync your-org/private-repo --token $GITHUB_TOKEN -p password
+```
+
+### Organization or User Repositories
+
+```bash
+# Sync all repos from an organization
+git2neo4j github-org anthropics --token $GITHUB_TOKEN -p password
+
+# Sync all repos from a user
+git2neo4j github-user guido --type owner --max-repos 10 -p password
+```
+
+### Python API
+
+```python
+from git2neo4j.github import sync_github_repository
+
+# Sync a GitHub repository without cloning
+stats = sync_github_repository(
+    owner="torvalds",
+    repo="linux",
+    neo4j_uri="bolt://localhost:7687",
+    neo4j_user="neo4j",
+    neo4j_password="password",
+    github_token=os.getenv("GITHUB_TOKEN"),  # Optional for public repos
+)
+
+print(f"Synced {stats['commits']} commits")
+```
+
+**Benefits:**
+- No local disk space needed
+- Sync private repositories you don't have write access to
+- Bulk sync organizations and users
+- Automatic rate limiting and pagination
+- Works with GitHub Enterprise (custom API URL)
+
 ## Automatic Sync with Git Hooks
 
 Automatically sync your repository to Neo4j on every commit or push:

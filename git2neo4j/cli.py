@@ -545,6 +545,257 @@ def cypher(
         raise typer.Exit(1)
 
 
+@app.command(name="github-sync")
+def github_sync(
+    repo: str = typer.Argument(
+        ...,
+        help="GitHub repository in format 'owner/repo'",
+    ),
+    uri: str = typer.Option(
+        "bolt://localhost:7687",
+        "--uri",
+        "-u",
+        help="Neo4j connection URI",
+    ),
+    user: str = typer.Option(
+        "neo4j",
+        "--user",
+        help="Neo4j username",
+    ),
+    password: str = typer.Option(
+        "password",
+        "--password",
+        "-p",
+        help="Neo4j password",
+    ),
+    database: str = typer.Option(
+        "neo4j",
+        "--database",
+        "-d",
+        help="Neo4j database name",
+    ),
+    github_token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        envvar="GITHUB_TOKEN",
+        help="GitHub personal access token",
+    ),
+    sync_trees: bool = typer.Option(
+        True,
+        "--trees/--no-trees",
+        help="Sync tree objects",
+    ),
+) -> None:
+    """Sync a GitHub repository to Neo4j without cloning."""
+    from git2neo4j.github.sync import sync_github_repository
+
+    try:
+        # Parse owner/repo
+        if "/" not in repo:
+            console.print("[red]Error: Repository must be in format 'owner/repo'[/red]")
+            raise typer.Exit(1)
+
+        owner, repo_name = repo.split("/", 1)
+
+        console.print(f"[bold blue]Syncing GitHub repository:[/bold blue] {owner}/{repo_name}")
+        console.print(f"[bold blue]Neo4j URI:[/bold blue] {uri}\n")
+
+        stats = sync_github_repository(
+            owner=owner,
+            repo=repo_name,
+            neo4j_uri=uri,
+            neo4j_user=user,
+            neo4j_password=password,
+            neo4j_database=database,
+            github_token=github_token,
+            sync_trees=sync_trees,
+        )
+
+        # Display statistics
+        table = Table(title="Sync Statistics")
+        table.add_column("Object Type", style="cyan")
+        table.add_column("Count", style="green", justify="right")
+
+        table.add_row("Commits", str(stats["commits"]))
+        table.add_row("Branches", str(stats["branches"]))
+        table.add_row("Tags", str(stats["tags"]))
+        table.add_row("Trees", str(stats["trees"]))
+
+        console.print(table)
+        console.print("[bold green]✓ GitHub repository synced successfully![/bold green]")
+
+    except Exception as e:
+        console.print(f"[red]Sync failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="github-org")
+def github_org(
+    org: str = typer.Argument(
+        ...,
+        help="GitHub organization name",
+    ),
+    uri: str = typer.Option(
+        "bolt://localhost:7687",
+        "--uri",
+        "-u",
+        help="Neo4j connection URI",
+    ),
+    user: str = typer.Option(
+        "neo4j",
+        "--user",
+        help="Neo4j username",
+    ),
+    password: str = typer.Option(
+        "password",
+        "--password",
+        "-p",
+        help="Neo4j password",
+    ),
+    database: str = typer.Option(
+        "neo4j",
+        "--database",
+        "-d",
+        help="Neo4j database name",
+    ),
+    github_token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        envvar="GITHUB_TOKEN",
+        help="GitHub personal access token",
+    ),
+    sync_trees: bool = typer.Option(
+        True,
+        "--trees/--no-trees",
+        help="Sync tree objects",
+    ),
+    max_repos: int = typer.Option(
+        None,
+        "--max-repos",
+        "-m",
+        help="Maximum number of repositories to sync",
+    ),
+) -> None:
+    """Sync all repositories from a GitHub organization."""
+    from git2neo4j.github.sync import sync_github_organization
+
+    try:
+        console.print(f"[bold blue]Syncing GitHub organization:[/bold blue] {org}\n")
+
+        stats = sync_github_organization(
+            org=org,
+            neo4j_uri=uri,
+            neo4j_user=user,
+            neo4j_password=password,
+            neo4j_database=database,
+            github_token=github_token,
+            sync_trees=sync_trees,
+            max_repos=max_repos,
+        )
+
+        # Display summary
+        console.print("\n[bold green]✓ Organization sync complete![/bold green]")
+        console.print(f"Repositories synced: {stats['repositories']}")
+        console.print(f"Total commits: {stats['total_commits']}")
+        console.print(f"Total branches: {stats['total_branches']}")
+
+        if stats['errors']:
+            console.print(f"\n[yellow]Errors: {len(stats['errors'])}[/yellow]")
+            for error in stats['errors'][:5]:
+                console.print(f"  - {error['repository']}: {error['error']}")
+
+    except Exception as e:
+        console.print(f"[red]Sync failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="github-user")
+def github_user(
+    username: str = typer.Argument(
+        ...,
+        help="GitHub username",
+    ),
+    uri: str = typer.Option(
+        "bolt://localhost:7687",
+        "--uri",
+        "-u",
+        help="Neo4j connection URI",
+    ),
+    user: str = typer.Option(
+        "neo4j",
+        "--user",
+        help="Neo4j username",
+    ),
+    password: str = typer.Option(
+        "password",
+        "--password",
+        "-p",
+        help="Neo4j password",
+    ),
+    database: str = typer.Option(
+        "neo4j",
+        "--database",
+        "-d",
+        help="Neo4j database name",
+    ),
+    github_token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        envvar="GITHUB_TOKEN",
+        help="GitHub personal access token",
+    ),
+    sync_trees: bool = typer.Option(
+        True,
+        "--trees/--no-trees",
+        help="Sync tree objects",
+    ),
+    type_filter: str = typer.Option(
+        "owner",
+        "--type",
+        help="Repository type filter (owner, member, all)",
+    ),
+    max_repos: int = typer.Option(
+        None,
+        "--max-repos",
+        "-m",
+        help="Maximum number of repositories to sync",
+    ),
+) -> None:
+    """Sync all repositories for a GitHub user."""
+    from git2neo4j.github.sync import sync_github_user_repos
+
+    try:
+        console.print(f"[bold blue]Syncing GitHub user repositories:[/bold blue] {username}\n")
+
+        stats = sync_github_user_repos(
+            username=username,
+            neo4j_uri=uri,
+            neo4j_user=user,
+            neo4j_password=password,
+            neo4j_database=database,
+            github_token=github_token,
+            sync_trees=sync_trees,
+            type_filter=type_filter,
+            max_repos=max_repos,
+        )
+
+        # Display summary
+        console.print("\n[bold green]✓ User repositories synced![/bold green]")
+        console.print(f"Repositories synced: {stats['repositories']}")
+        console.print(f"Total commits: {stats['total_commits']}")
+        console.print(f"Total branches: {stats['total_branches']}")
+
+        if stats['errors']:
+            console.print(f"\n[yellow]Errors: {len(stats['errors'])}[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Sync failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command(name="install-hook")
 def install_hook(
     repo_path: str = typer.Argument(
