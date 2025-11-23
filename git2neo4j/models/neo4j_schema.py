@@ -28,6 +28,7 @@ class CommitNode(Neo4jNode):
     """Neo4j node representing a Git commit."""
 
     sha: str = Field(..., description="Commit SHA-1 hash")
+    repo_name: str = Field(..., description="Repository name")
     tree_sha: str = Field(..., description="Root tree SHA")
     message: str = Field(..., description="Commit message")
     author_name: str = Field(..., description="Author name")
@@ -57,6 +58,7 @@ class TreeNode(Neo4jNode):
     """Neo4j node representing a Git tree."""
 
     sha: str = Field(..., description="Tree SHA-1 hash")
+    repo_name: str = Field(..., description="Repository name")
     size: int = Field(..., ge=0, description="Tree size in bytes")
     entry_count: int = Field(..., ge=0, description="Number of entries")
     file_count: int = Field(default=0, ge=0, description="Number of files")
@@ -67,17 +69,19 @@ class BlobNode(Neo4jNode):
     """Neo4j node representing a Git blob."""
 
     sha: str = Field(..., description="Blob SHA-1 hash")
+    repo_name: str = Field(..., description="Repository name")
     size: int = Field(..., ge=0, description="Blob size in bytes")
     path: str | None = Field(default=None, description="File path")
     is_binary: bool = Field(default=False, description="Whether blob is binary")
-    # Note: We don't store actual content in Neo4j, just metadata
-    # Content can be retrieved from Git when needed
+    text_content: str | None = Field(default=None, description="Text file content (for full-text search)")
+    extension: str | None = Field(default=None, description="File extension")
 
 
 class TagNode(Neo4jNode):
     """Neo4j node representing a Git tag."""
 
     sha: str = Field(..., description="Tag SHA-1 hash")
+    repo_name: str = Field(..., description="Repository name")
     name: str = Field(..., description="Tag name")
     target_sha: str = Field(..., description="Target object SHA")
     target_type: str = Field(..., description="Target object type")
@@ -93,6 +97,7 @@ class BranchNode(Neo4jNode):
     """Neo4j node representing a Git branch."""
 
     name: str = Field(..., description="Branch name")
+    repo_name: str = Field(..., description="Repository name")
     full_name: str = Field(..., description="Full branch name with remote")
     commit_sha: str = Field(..., description="Commit SHA branch points to")
     is_remote: bool = Field(default=False, description="Whether this is a remote branch")
@@ -183,6 +188,18 @@ class TracksRelationship(Neo4jRelationship):
     pass
 
 
+class ContainsRelationship(Neo4jRelationship):
+    """Relationship from repository to commits (all commits in the repo)."""
+
+    pass
+
+
+class HasHeadRelationship(Neo4jRelationship):
+    """Relationship from repository to current HEAD commit."""
+
+    pass
+
+
 # Index and constraint definitions for Neo4j
 NEO4J_CONSTRAINTS = [
     "CREATE CONSTRAINT commit_sha IF NOT EXISTS FOR (c:Commit) REQUIRE c.sha IS UNIQUE",
@@ -198,7 +215,26 @@ NEO4J_INDEXES = [
     "CREATE INDEX commit_timestamp IF NOT EXISTS FOR (c:Commit) ON (c.author_timestamp)",
     "CREATE INDEX commit_author_email IF NOT EXISTS FOR (c:Commit) ON (c.author_email)",
     "CREATE INDEX commit_message IF NOT EXISTS FOR (c:Commit) ON (c.message)",
+    "CREATE INDEX commit_repo_name IF NOT EXISTS FOR (c:Commit) ON (c.repo_name)",
     "CREATE INDEX branch_name IF NOT EXISTS FOR (b:Branch) ON (b.name)",
+    "CREATE INDEX branch_repo_name IF NOT EXISTS FOR (b:Branch) ON (b.repo_name)",
     "CREATE INDEX blob_path IF NOT EXISTS FOR (b:Blob) ON (b.path)",
+    "CREATE INDEX blob_repo_name IF NOT EXISTS FOR (b:Blob) ON (b.repo_name)",
+    "CREATE INDEX blob_extension IF NOT EXISTS FOR (b:Blob) ON (b.extension)",
+    "CREATE INDEX tree_repo_name IF NOT EXISTS FOR (t:Tree) ON (t.repo_name)",
+    "CREATE INDEX tag_repo_name IF NOT EXISTS FOR (t:Tag) ON (t.repo_name)",
     "CREATE INDEX author_name IF NOT EXISTS FOR (a:Author) ON (a.name)",
+]
+
+# Full-text indexes for searching
+NEO4J_FULLTEXT_INDEXES = [
+    # Full-text search on blob content (text files)
+    """CREATE FULLTEXT INDEX blob_content_fulltext IF NOT EXISTS
+       FOR (b:Blob) ON EACH [b.text_content]""",
+    # Full-text search on commit messages
+    """CREATE FULLTEXT INDEX commit_message_fulltext IF NOT EXISTS
+       FOR (c:Commit) ON EACH [c.message]""",
+    # Full-text search on file paths
+    """CREATE FULLTEXT INDEX blob_path_fulltext IF NOT EXISTS
+       FOR (b:Blob) ON EACH [b.path]""",
 ]

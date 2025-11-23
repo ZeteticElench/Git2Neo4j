@@ -12,6 +12,7 @@ from rich import print as rprint
 
 from git2neo4j.config import Config
 from git2neo4j.queries.cypher_ops import CypherGitOps
+from git2neo4j.sync.bulk_import import import_repositories_from_folder
 from git2neo4j.sync.git_to_neo4j import GitToNeo4jSync
 from git2neo4j.sync.neo4j_to_git import Neo4jToGitSync
 
@@ -125,6 +126,90 @@ def sync(
 
     except Exception as e:
         console.print(f"[red]Sync failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="bulk-import")
+def bulk_import(
+    folder_path: str = typer.Argument(
+        ".",
+        help="Path to folder containing Git repositories",
+    ),
+    uri: str = typer.Option(
+        "bolt://localhost:7687",
+        "--uri",
+        "-u",
+        help="Neo4j connection URI",
+    ),
+    user: str = typer.Option(
+        "neo4j",
+        "--user",
+        help="Neo4j username",
+    ),
+    password: str = typer.Option(
+        "password",
+        "--password",
+        "-p",
+        help="Neo4j password",
+    ),
+    database: str = typer.Option(
+        "neo4j",
+        "--database",
+        "-d",
+        help="Neo4j database name",
+    ),
+    batch_size: int = typer.Option(
+        100,
+        "--batch-size",
+        "-b",
+        help="Batch size for operations",
+    ),
+    sync_trees: bool = typer.Option(
+        True,
+        "--trees/--no-trees",
+        help="Sync tree objects",
+    ),
+    sync_blobs: bool = typer.Option(
+        False,
+        "--blobs/--no-blobs",
+        help="Sync blob metadata",
+    ),
+    populate_text: bool = typer.Option(
+        False,
+        "--populate-text/--no-populate-text",
+        help="Populate text content for blobs",
+    ),
+    recursive: bool = typer.Option(
+        False,
+        "--recursive/--no-recursive",
+        "-r",
+        help="Recursively search for repositories",
+    ),
+) -> None:
+    """Import all Git repositories from a folder."""
+    folder_path_obj = Path(folder_path).resolve()
+
+    if not folder_path_obj.exists():
+        console.print(f"[red]Error: Folder does not exist: {folder_path}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        stats = import_repositories_from_folder(
+            folder_path=folder_path_obj,
+            neo4j_uri=uri,
+            neo4j_user=user,
+            neo4j_password=password,
+            neo4j_database=database,
+            batch_size=batch_size,
+            sync_trees=sync_trees,
+            sync_blobs=sync_blobs,
+            populate_blob_text=populate_text,
+            recursive=recursive,
+            create_schema=True,
+        )
+
+    except Exception as e:
+        console.print(f"[red]Bulk import failed: {e}[/red]")
         raise typer.Exit(1)
 
 
